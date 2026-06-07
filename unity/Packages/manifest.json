@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "com.unity.netcode.gameobjects": "2.2.0",
+    "com.unity.transport": "2.4.0",
+    "com.unity.render-pipelines.universal": "17.4.0",
+    "com.unity.inputsystem": "1.11.2",
+    "com.unity.cinemachine": "3.1.2",
+    "com.unity.ugui": "2.0.0",
+    "com.unity.modules.uielements": "1.0.0",
+    "com.unity.modules.physics": "1.0.0",
+    "com.unity.modules.audio": "1.0.0",
+    "com.unity.test-framework": "1.4.5"
+  },
+  "//": "Unity 6000.4.4f1. Netcode for GameObjects + Unity Transport drive the co-op session; URP visuals; new Input System; Cinemachine 3. Proximity voice (Vivox/Dissonance) is added per-build via ProximityVoice."
+}
