@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="180" viewBox="0 0 560 180" font-family="'Trebuchet MS','Segoe UI',sans-serif">
+  <rect width="560" height="180" fill="#0a3a52" rx="16"/>
+  <!-- little sloop -->
+  <g transform="translate(280,52)">
+    <path d="M-58 18 q58 22 116 0 l-12 22 q-46 14 -92 0z" fill="#8a5a32" stroke="#5e3c1d" stroke-width="3"/>
+    <rect x="-3" y="-34" width="6" height="52" fill="#5e3c1d"/>
+    <path d="M3 -30 q34 14 26 44 l-26 0z" fill="#f3efe4"/>
+    <circle cx="-26" cy="14" r="8" fill="#ffd14a"/>
+    <circle cx="0" cy="14" r="8" fill="#7be38a"/>
+    <circle cx="26" cy="14" r="8" fill="#9bd0ff"/>
+  </g>
+  <text x="280" y="126" text-anchor="middle" fill="#eaf6ff" font-size="44" letter-spacing="6" font-weight="bold">SLOOP TROOP</text>
+  <text x="280" y="154" text-anchor="middle" fill="#ffd14a" font-size="13" letter-spacing="3">A CONSTRUCTIVE CO-OP COMEDY</text>
+</svg>

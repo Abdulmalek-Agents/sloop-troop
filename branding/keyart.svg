@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520" font-family="'Trebuchet MS', 'Segoe UI', sans-serif">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9bd7ef"/>
+      <stop offset="60%" stop-color="#5fb8e0"/>
+      <stop offset="100%" stop-color="#2f93c4"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1f86b8"/>
+      <stop offset="100%" stop-color="#0a3a52"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="300" fill="url(#sky)"/>
+  <rect y="300" width="1280" height="220" fill="url(#sea)"/>
+
+  <!-- sun -->
+  <circle cx="1080" cy="96" r="54" fill="#ffe07a"/>
+
+  <!-- distant lighthouse island (the constructive goal) -->
+  <g>
+    <ellipse cx="1015" cy="318" rx="150" ry="34" fill="#15506e"/>
+    <rect x="985" y="206" width="40" height="112" fill="#eef3f6"/>
+    <rect x="985" y="220" width="40" height="12" fill="#d23b3b"/>
+    <rect x="985" y="250" width="40" height="12" fill="#d23b3b"/>
+    <rect x="985" y="280" width="40" height="12" fill="#d23b3b"/>
+    <circle cx="1005" cy="200" r="11" fill="#ffe07a"/>
+    <polygon points="980,200 1030,200 1005,182" fill="#b23030"/>
+  </g>
+
+  <!-- waves -->
+  <g fill="rgba(255,255,255,0.18)">
+    <path d="M0 350 q60 -16 120 0 t120 0 t120 0 t120 0 t120 0 t120 0 t120 0 t120 0 t120 0 l0 30 -1280 0z"/>
+  </g>
+
+  <!-- the leaky sloop with crew -->
+  <g>
+    <!-- hull -->
+    <path d="M360 360 q300 70 560 0 l-40 70 q-240 46 -480 0z" fill="#8a5a32" stroke="#5e3c1d" stroke-width="5"/>
+    <rect x="430" y="300" width="360" height="60" rx="10" fill="#a07042" stroke="#5e3c1d" stroke-width="4"/>
+    <!-- mast + sail -->
+    <rect x="606" y="170" width="10" height="150" fill="#5e3c1d"/>
+    <path d="M616 178 q90 40 70 120 l-70 0z" fill="#f3efe4" stroke="#cfc6ad" stroke-width="3"/>
+    <!-- crew (bath-toy blobs) -->
+    <circle cx="500" cy="320" r="18" fill="#ffd14a"/><circle cx="494" cy="316" r="2.5" fill="#23304a"/><circle cx="506" cy="316" r="2.5" fill="#23304a"/>
+    <circle cx="560" cy="324" r="18" fill="#7be38a"/><circle cx="554" cy="320" r="2.5" fill="#23304a"/><circle cx="566" cy="320" r="2.5" fill="#23304a"/>
+    <circle cx="690" cy="322" r="18" fill="#9bd0ff"/><circle cx="684" cy="318" r="2.5" fill="#23304a"/><circle cx="696" cy="318" r="2.5" fill="#23304a"/>
+    <!-- salvage being co-carried (a beam) -->
+    <rect x="600" y="300" width="120" height="14" rx="4" fill="#c98a4b" stroke="#5e3c1d" stroke-width="3"/>
+    <!-- proximity-voice bubble -->
+    <g transform="translate(470,268)">
+      <rect x="-44" y="-22" width="88" height="34" rx="8" fill="#ffffff" opacity="0.92"/>
+      <polygon points="-8,12 8,12 0,24" fill="#ffffff" opacity="0.92"/>
+      <text x="0" y="1" text-anchor="middle" fill="#23304a" font-size="13" font-weight="bold">OVER HEERE!</text>
+    </g>
+  </g>
+
+  <!-- title tag -->
+  <rect x="0" y="476" width="1280" height="44" fill="rgba(7,36,52,0.55)"/>
+  <text x="640" y="505" text-anchor="middle" fill="#eaf6ff" font-size="20" letter-spacing="6">SALVAGE TOGETHER · SINK TOGETHER</text>
+</svg>
