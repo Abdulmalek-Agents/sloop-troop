@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='UTF-8' />
+<meta name='viewport' content='width=device-width, initial-scale=1.0' />
+<title>Sloop Troop - Core Loop Prototype</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',system-ui,sans-serif}
+  body{background:#072434;color:#eaf6ff;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:16px}
+  #wrap{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;max-width:1180px}
+  canvas{background:#0a3a52;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+  #side{width:300px;display:flex;flex-direction:column;gap:12px}
+  .card{background:#0c2f44;border:1px solid #15506e;border-radius:10px;padding:14px}
+  h1{font-size:20px;letter-spacing:.5px} h1 small{display:block;font-weight:400;color:#8fc4dd;font-size:12px;margin-top:4px}
+  .bar{height:14px;border-radius:8px;background:#06283a;overflow:hidden;margin-top:6px}
+  .bar>i{display:block;height:100%;transition:width .15s}
+  .row{display:flex;justify-content:space-between;font-size:13px;margin:8px 0 2px}
+  .pill{background:#103a52;border:1px solid #1d5d80;border-radius:20px;padding:4px 10px;font-size:12px;display:inline-block;margin:2px}
+  .pill b{color:#fff}
+  #log{height:104px;overflow:auto;font-size:12px;line-height:1.5;color:#a9d4e6}
+  #log div{padding:2px 0;border-bottom:1px solid #0e3346}
+  kbd{background:#103a52;border:1px solid #1d5d80;border-bottom-width:2px;border-radius:5px;padding:1px 6px;font-size:11px}
+  .keys{font-size:12px;color:#9fcbe0;line-height:1.9}
+  button{cursor:pointer;background:#ffd14a;color:#23304a;border:0;border-radius:8px;padding:9px 12px;font-weight:700}
+  button.secondary{background:#103a52;color:#eaf6ff}
+  .flex{display:flex;gap:8px}
+  #trimVal{font-weight:700}
+</style>
+</head>
+<body>
+<div id='wrap'>
+  <canvas id='game' width='720' height='560'></canvas>
+  <div id='side'>
+    <div class='card'>
+      <h1>SLOOP TROOP <small>Core-loop prototype - salvage, trim, build (with AI crew)</small></h1>
+    </div>
+    <div class='card'>
+      <div class='row'><span>Outpost rebuilt</span><span id='buildVal'>0 / 12</span></div>
+      <div class='bar'><i id='buildBar' style='width:0%;background:linear-gradient(90deg,#ffd14a,#7be38a)'></i></div>
+      <div class='row'><span>Deck trim (loose cargo)</span><span id='trimVal'>steady</span></div>
+      <div class='bar'><i id='trimBar' style='width:0%;background:linear-gradient(90deg,#7be38a,#ffd14a)'></i></div>
+      <div class='row'><span>Next swell</span><span id='swellVal'>--</span></div>
+      <div class='bar'><i id='swellBar' style='width:0%;background:linear-gradient(90deg,#4aa3ff,#9bd0ff)'></i></div>
+    </div>
+    <div class='card'>
+      <span class='pill'>Expedition <b id='expVal'>1</b></span>
+      <span class='pill'>Crew <b id='crewVal'>3</b></span>
+      <span class='pill'>Carrying <b id='carryVal'>-</b></span>
+    </div>
+    <div class='card keys'>
+      <b>Controls</b><br/>
+      <kbd>W A S D</kbd> / arrows - move<br/>
+      <kbd>E</kbd> - grab salvage / drop on Build Pad<br/>
+      <kbd>Space</kbd> - yell (call a deckhand to co-carry a heavy beam)<br/>
+      <div class='flex' style='margin-top:10px'>
+        <button id='startBtn'>Cast off</button>
+        <button id='resetBtn' class='secondary'>Reset</button>
+      </div>
+    </div>
+    <div class='card'><div id='log'></div></div>
+  </div>
+</div>
+<script>
+/* ============================================================================
+   SLOOP TROOP - self-contained HTML5 Canvas prototype (vanilla JS, no deps).
+   Studio niche pick #2: constructive, non-horror cooperative (friendslop).
+   Models the loop: SALVAGE physics-junk -> manage DECK TRIM -> BUILD the
+   outpost together, with AI deckhands + proximity-voice callouts + the SWELL.
+   ========================================================================== */
+(() => {
+  const cv = document.getElementById('game'), cx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  let player, crew, salvage, buildPad, deck, build, goal, exp, swell, swellWarn, listAngle, running, msgTimer;
+
+  const COLORS = ['#c98a4b','#b56a3a','#8a6f4a','#9a5b3c'];
+
+  function rnd(a,b){ return a + Math.random()*(b-a); }
+
+  function reset(){
+    exp = 1; goal = 12; build = 0;
+    deck = {x:200, y:120, w:320, h:320};           // the sloop deck (safe stow zone)
+    buildPad = {x:560, y:210, w:130, h:150};        // island Build Pad (right)
+    player = {x:360, y:300, r:13, carry:null, speed:2.4, name:'You', vx:0, vy:0};
+    crew = [
+      makeHand('Pip', 300, 360, '#7be38a'),
+      makeHand('Bo', 420, 250, '#9bd0ff')
+    ];
+    salvage = [];
+    for(let i=0;i<6;i++) spawnSalvage();
+    swell = 9; swellWarn = 0; listAngle = 0; running = false; msgTimer = 0;
+    log('Anchored off Gull Rock. Haul salvage to the Build Pad and rebuild the lighthouse.');
+    updateHUD();
+  }
+
+  function makeHand(name,x,y,col){ return {x,y,r:12,carry:null,speed:rnd(1.4,1.9),name,col,target:null,think:0,say:0,helping:null}; }
+
+  function spawnSalvage(){
+    // drift in from the watery left/top edges
+    const heavy = Math.random()<0.28;
+    const edge = Math.random()<0.5;
+    const s = {
+      x: edge? rnd(20,180) : rnd(60,360),
+      y: edge? rnd(60,500) : rnd(20,90),
+      r: heavy? 18 : 12, heavy, held:null, builtFlag:false,
+      col: COLORS[(Math.random()*COLORS.length)|0],
+      vx: rnd(0.1,0.5), vy: rnd(-0.2,0.4)
+    };
+    salvage.push(s);
+  }
+
+  // ---- input ---------------------------------------------------------------
+  const keys = {};
+  addEventListener('keydown', e=>{ const k=e.key.toLowerCase();
+    keys[k]=true;
+    if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k)) e.preventDefault();
+    if(!running) return;
+    if(k==='e') playerGrabOrDrop();
+    if(k===' ') yell();
+  });
+  addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
+
+  function log(m){ const d=document.createElement('div'); d.textContent=m; const L=document.getElementById('log');
+    L.prepend(d); while(L.children.length>40) L.lastChild.remove(); }
+
+  // ---- player actions ------------------------------------------------------
+  function nearestFree(x,y,maxD){ let best=null,bd=maxD;
+    for(const s of salvage){ if(s.held||s.builtFlag) continue; const d=Math.hypot(s.x-x,s.y-y); if(d<bd){bd=d;best=s;} }
+    return best;
+  }
+  function overPad(x,y){ return x>buildPad.x && x<buildPad.x+buildPad.w && y>buildPad.y && y<buildPad.y+buildPad.h; }
+
+  function playerGrabOrDrop(){
+    if(player.carry){
+      const s = player.carry;
+      if(overPad(player.x,player.y)){
+        // deliver -> build
+        consume(s); build++; log('Snapped a piece into the lighthouse (+1).');
+        if(build>=goal) nextIsland();
+      } else {
+        s.held=null; player.carry=null; log('Dropped salvage on the deck. Mind the trim!');
+      }
+      // release any co-carry helper
+      for(const h of crew) if(h.helping===s) h.helping=null;
+    } else {
+      const s = nearestFree(player.x,player.y,30);
+      if(s){ s.held='You'; player.carry=s; log(s.heavy? 'Grabbed a heavy beam - yell (Space) for a hand!' : 'Grabbed salvage.'); }
+    }
+    updateHUD();
+  }
+
+  function yell(){
+    player.say = 1.0;
+    if(player.carry && player.carry.heavy){
+      // summon nearest idle-ish hand to co-carry
+      let best=null,bd=1e9; for(const h of crew){ const d=Math.hypot(h.x-player.x,h.y-player.y); if(d<bd){bd=d;best=h;} }
+      if(best){ best.helping=player.carry; best.carry=null; best.target=null; best.say=1; log(best.name+': On it! (co-carrying the beam)'); }
+    } else log('You: OVER HEEERE!');
+  }
+
+  function consume(s){ const i=salvage.indexOf(s); if(i>=0) salvage.splice(i,1);
+    if(player.carry===s) player.carry=null; for(const h of crew) if(h.carry===s) h.carry=null; }
+
+  function nextIsland(){
+    exp++; goal = 12 + exp*4; build = 0;
+    log('LIGHTHOUSE RESTORED! The crew sails on to a bigger wreck. Goal is now '+goal+'.');
+    salvage.length=0; for(let i=0;i<7;i++) spawnSalvage();
+    updateHUD();
+  }
+
+  // ---- AI crew -------------------------------------------------------------
+  function updateHand(h, dt){
+    if(h.say>0) h.say-=dt;
+    if(h.helping){ // shadow the player while co-carrying
+      const tx=player.x-18, ty=player.y; h.x+=(tx-h.x)*0.15; h.y+=(ty-h.y)*0.15; return; }
+    h.think-=dt;
+    if(h.carry){
+      // head to build pad
+      const tx=buildPad.x+buildPad.w/2, ty=buildPad.y+buildPad.h/2;
+      moveTo(h,tx,ty);
+      if(overPad(h.x,h.y)){ consume(h.carry); build++; h.carry=null; h.say=1; log(h.name+': Nice, that fits! (+1)');
+        if(build>=goal) nextIsland(); updateHUD(); }
+    } else {
+      if(!h.target || h.target.held || h.target.builtFlag){ h.target = nearestFree(h.x,h.y,500); }
+      if(h.target){ moveTo(h,h.target.x,h.target.y);
+        if(Math.hypot(h.target.x-h.x,h.target.y-h.y)<22){ h.target.held=h.name; h.carry=h.target; h.target=null; if(Math.random()<0.4){h.say=1;} } }
+      else moveTo(h, rnd(220,500), rnd(160,420));
+    }
+    if(h.think<=0){ h.think=rnd(2,5); if(Math.random()<0.5) h.say=1; }
+  }
+  function moveTo(a,tx,ty){ const dx=tx-a.x,dy=ty-a.y,d=Math.hypot(dx,dy)||1; a.x+=dx/d*a.speed; a.y+=dy/d*a.speed; }
+
+  // ---- main loop -----------------------------------------------------------
+  let last=performance.now();
+  function frame(now){
+    const dt=Math.min(0.05,(now-last)/1000); last=now;
+    if(running){
+      // player movement (heavy beam alone = slow unless a hand helps)
+      let sp=player.speed;
+      if(player.carry && player.carry.heavy){ const helped=crew.some(h=>h.helping===player.carry); sp = helped? player.speed: player.speed*0.5; }
+      let dx=0,dy=0;
+      if(keys['w']||keys['arrowup'])dy=-1; if(keys['s']||keys['arrowdown'])dy=1;
+      if(keys['a']||keys['arrowleft'])dx=-1; if(keys['d']||keys['arrowright'])dx=1;
+      const dl=Math.hypot(dx,dy)||1; player.x+=dx/dl*sp*(dx||dy?1:0); player.y+=dy/dl*sp*(dx||dy?1:0);
+      // list (trim) shove: if deck overloaded, slide everything to starboard
+      const loose = salvage.filter(s=>!s.held && !s.builtFlag && onDeck(s)).length;
+      const targetList = Math.min(1, Math.max(0, (loose-3)/5));
+      listAngle += (targetList - listAngle)*0.05;
+      if(listAngle>0.02){ player.x += listAngle*1.4; for(const s of salvage){ if(!s.held&&onDeck(s)) s.x += listAngle*1.8; } }
+
+      if(player.say>0) player.say-=dt;
+      // carried salvage follows holder
+      if(player.carry){ player.carry.x=player.x+10; player.carry.y=player.y-2; }
+      for(const h of crew){ if(h.carry){ h.carry.x=h.x+8; h.carry.y=h.y-2; } updateHand(h,dt); }
+
+      // drifting + gentle replenish
+      for(const s of salvage){ if(!s.held){ s.x+=s.vx*(onDeck(s)?0:1); s.y+=s.vy*(onDeck(s)?0:1);
+        if(s.x>W+30||s.y>H+30||s.x<-30){ s.x=rnd(20,160); s.y=rnd(60,500); } } }
+      if(salvage.length<6 && Math.random()<0.02) spawnSalvage();
+
+      // swell director
+      swell-=dt;
+      if(swell<2.2 && swellWarn<=0){ swellWarn=0.01; log('A SWELL is building on the horizon - brace and stow!'); }
+      if(swell<=0){ doSwell(); swell = rnd(8,12); }
+      if(swellWarn>0) swellWarn+=dt;
+
+      updateHUD();
+    }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  function onDeck(s){ return s.x>deck.x && s.x<deck.x+deck.w && s.y>deck.y && s.y<deck.y+deck.h; }
+
+  function doSwell(){
+    swellWarn=0;
+    log('THE SWELL HITS! Loose cargo slides to starboard.');
+    const push = rnd(40,80);
+    player.x += push*0.6;
+    for(const s of salvage){ if(!s.held){ s.x += push; s.y += rnd(-12,12); } }
+    // chance to fumble what you carry
+    if(player.carry && Math.random()<0.5){ player.carry.held=null; player.carry=null; log('You fumbled your salvage in the swell!'); }
+  }
+
+  // ---- rendering -----------------------------------------------------------
+  function render(){
+    // water
+    cx.fillStyle='#0a3a52'; cx.fillRect(0,0,W,H);
+    for(let i=0;i<40;i++){ const y=(i*40 + (performance.now()/40))%H; cx.fillStyle='rgba(255,255,255,0.03)'; cx.fillRect(0,y,W,2); }
+
+    // deck (sloop) with slight list tilt
+    cx.save(); cx.translate(deck.x+deck.w/2, deck.y+deck.h/2); cx.rotate(listAngle*0.06); cx.translate(-(deck.x+deck.w/2),-(deck.y+deck.h/2));
+    cx.fillStyle='#7a5a39'; roundRect(deck.x,deck.y,deck.w,deck.h,16); cx.fill();
+    cx.fillStyle='#8c6a45'; for(let i=0;i<7;i++){ cx.fillRect(deck.x+10, deck.y+14+i*44, deck.w-20, 30); }
+    cx.strokeStyle='#5e4023'; cx.lineWidth=4; roundRect(deck.x,deck.y,deck.w,deck.h,16); cx.stroke();
+    cx.restore();
+
+    // build pad / lighthouse
+    cx.fillStyle='#10405a'; roundRect(buildPad.x,buildPad.y,buildPad.w,buildPad.h,12); cx.fill();
+    cx.strokeStyle='#2f7fb0'; cx.lineWidth=3; cx.setLineDash([6,5]); roundRect(buildPad.x,buildPad.y,buildPad.w,buildPad.h,12); cx.stroke(); cx.setLineDash([]);
+    drawLighthouse(buildPad.x+buildPad.w/2, buildPad.y+buildPad.h-12, build/goal);
+    cx.fillStyle='#bfe0f2'; cx.font='12px Segoe UI'; cx.textAlign='center'; cx.fillText('BUILD PAD', buildPad.x+buildPad.w/2, buildPad.y-8); cx.textAlign='left';
+
+    // salvage
+    for(const s of salvage){ if(s.builtFlag) continue;
+      cx.fillStyle=s.col; if(s.heavy){ cx.fillRect(s.x-22,s.y-6,44,12); cx.strokeStyle='#3c2a18'; cx.strokeRect(s.x-22,s.y-6,44,12); }
+      else { cx.fillRect(s.x-9,s.y-9,18,18); cx.strokeStyle='#3c2a18'; cx.strokeRect(s.x-9,s.y-9,18,18); cx.strokeStyle='#3c2a18'; cx.beginPath(); cx.moveTo(s.x-9,s.y); cx.lineTo(s.x+9,s.y); cx.stroke(); }
+    }
+
+    // crew
+    for(const h of crew) drawActor(h.x,h.y,h.r,h.col,h.name,h.say>0);
+    drawActor(player.x,player.y,player.r,'#ffd14a','You',player.say>0);
+
+    // swell warning banner
+    if(swellWarn>0){ const a=0.4+0.3*Math.sin(performance.now()/120);
+      cx.fillStyle='rgba(255,90,90,'+a.toFixed(2)+')'; cx.fillRect(0,0,W,26);
+      cx.fillStyle='#fff'; cx.font='bold 14px Segoe UI'; cx.textAlign='center'; cx.fillText('SWELL INCOMING - STOW LOOSE CARGO!', W/2, 18); cx.textAlign='left'; }
+
+    if(!running){ cx.fillStyle='rgba(5,20,30,0.55)'; cx.fillRect(0,0,W,H);
+      cx.fillStyle='#eaf6ff'; cx.font='600 22px Segoe UI'; cx.textAlign='center';
+      cx.fillText('Press Cast off - rebuild the lighthouse with your crew', W/2, H/2);
+      cx.font='13px Segoe UI'; cx.fillStyle='#9fcbe0';
+      cx.fillText('Constructive friendslop: salvage together, do not capsize the trim', W/2, H/2+26); cx.textAlign='left'; }
+  }
+
+  function drawActor(x,y,r,col,name,speaking){
+    if(speaking){ cx.strokeStyle='rgba(123,227,138,0.8)'; cx.lineWidth=2; cx.beginPath(); cx.arc(x,y,r+7,0,7); cx.stroke();
+      cx.fillStyle='#cdeccf'; cx.font='10px Segoe UI'; cx.textAlign='center'; cx.fillText('((( )))', x, y-r-10); cx.textAlign='left'; }
+    cx.fillStyle=col; cx.beginPath(); cx.arc(x,y,r,0,7); cx.fill();
+    cx.fillStyle='#23304a'; cx.beginPath(); cx.arc(x-4,y-2,2,0,7); cx.arc(x+4,y-2,2,0,7); cx.fill();
+    cx.fillStyle='#cfe7f5'; cx.font='10px Segoe UI'; cx.textAlign='center'; cx.fillText(name, x, y+r+11); cx.textAlign='left';
+  }
+
+  function drawLighthouse(cxp,cyp,p){
+    const fullH=110, h=14+fullH*Math.min(1,p);
+    cx.fillStyle='#e9eef2'; cx.fillRect(cxp-16, cyp-h, 32, h);
+    cx.fillStyle='#d23b3b'; for(let i=0;i<Math.floor(h/22);i++){ cx.fillRect(cxp-16, cyp-h+i*22+6, 32, 8); }
+    if(p>=1){ cx.fillStyle='#ffe07a'; cx.beginPath(); cx.arc(cxp, cyp-h-4, 9,0,7); cx.fill(); }
+  }
+
+  function roundRect(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
+
+  // ---- HUD -----------------------------------------------------------------
+  const $=id=>document.getElementById(id);
+  function updateHUD(){
+    $('buildVal').textContent=build+' / '+goal; $('buildBar').style.width=Math.min(100,build/goal*100)+'%';
+    const loose = salvage.filter(s=>!s.held && !s.builtFlag && onDeck(s)).length;
+    const trimPct=Math.min(100, loose/8*100);
+    $('trimBar').style.width=trimPct+'%';
+    $('trimVal').textContent = loose<=3?'steady' : loose<=5?'listing!' : 'CAPSIZING!';
+    $('trimVal').style.color = loose<=3?'#7be38a' : loose<=5?'#ffd14a':'#ff6a6a';
+    const sw=Math.max(0,swell); $('swellBar').style.width=(100-Math.min(100,sw/12*100))+'%';
+    $('swellVal').textContent = sw>0? sw.toFixed(0)+'s' : 'NOW';
+    $('expVal').textContent=exp; $('crewVal').textContent=crew.length+1;
+    $('carryVal').textContent = player.carry? (player.carry.heavy?'beam':'crate') : '-';
+  }
+
+  $('startBtn').onclick=()=>{ running=true; log('Cast off! Yell with Space to call a hand for heavy beams.'); };
+  $('resetBtn').onclick=()=>{ reset(); };
+
+  reset(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
